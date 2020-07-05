@@ -1,0 +1,2 @@
+# askindex
+New NSE INdex
