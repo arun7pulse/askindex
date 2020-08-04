@@ -1,2 +1,3 @@
 # askindex
-New NSE INdex
+
+To find the pattern in the NSE Index data
