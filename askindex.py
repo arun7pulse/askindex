@@ -51,12 +51,10 @@ def split_date_range(start, end, pdays=92):
         yield sdate, edate
 
 
-def get_hist_index_data(symbol="NIFTY 50"):
+def get_hist_index_data(symbol="NIFTY 50", file=None):
     if symbol.upper() == "NIFTY 50":
-        # file = "https://raw.githubusercontent.com/arun7pulse/askindex/master/NIFTY%2050_01-01-2000_31-12-2019.csv"
         file = "https://raw.githubusercontent.com/arun7pulse/askindex/master/NIFTY%2050.csv"
     if symbol.upper() == "NIFTY BANK":
-        # file = "https://raw.githubusercontent.com/arun7pulse/askindex/master/NIFTY%20BANK_01-01-2000_31-12-2019.csv"
         file = "https://raw.githubusercontent.com/arun7pulse/askindex/master/NIFTY%20BANK.csv"
     df = pd.read_csv(file, parse_dates=True, index_col='date',
                      dayfirst=True, error_bad_lines=False).replace("-", method='bfill')
@@ -100,12 +98,12 @@ def get_all_index_data(symbol='NIFTY 50', start='01-01-2010', end=(datetime.date
         print("Loading Index Data :", symbol, sdate, edate)
         df = get_daily_index_data(symbol=symbol, start=sdate, end=edate)
         idx = idx.append(df, verify_integrity=True)
+    idx.to_csv("{}.csv".format(symbol))
     try:
         idx = idx.replace("-", method='bfill')
         idx = idx.astype({"symbol": "category", "open": "float64", "high": "float64", "low": "float64", "close": "float64", "volume": "float64", "value": "float64"})
     except:
         pass
-    idx.to_csv("{}.csv".format(symbol))
     return idx
 
 def dataframe_target(df, top_percent=5):
@@ -154,5 +152,5 @@ class Indices(object):
         self.dfwfm = dataframe_target(self.dfwfm)
 
 if __name__ == '__main__':
-    nf = Indices(symbol="NIFTY 50")
-    bf = Indices(symbol="NIFTY BANK")
+    nf = Indices("NIFTY 50")
+    bf = Indices("NIFTY BANK")
