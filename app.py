@@ -59,7 +59,6 @@ def load_job():
         df.load_livedata()
     print("Data Loaded", df.dff.tail(1).to_json())
 
-
 @app.route("/")
 def main():
     return """<h2>Indices</h2>

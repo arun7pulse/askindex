@@ -1,10 +1,11 @@
 #Author ArunSK.
 import os
-import datetime
 import logging
 import requests
 import pandas as pd  # Higher-level numerical Python library.
 import numpy as np  # Low-level numerical Python library.
+
+from datetime import datetime, timedelta
 
 headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36',
            'Accept-Encoding': 'gzip, deflate, br', 'Accept-Language': 'en-US,en;q=0.9,hi;q=0.8'}
@@ -30,41 +31,57 @@ except NameError:
     pass
 
 def last_thursday():
-    today = datetime.datetime.today().date()
+    today = datetime.today().date()
     offset = (today.weekday() - 3) % 7
-    return today - datetime.timedelta(days=offset)
+    return today - timedelta(days=offset)
+
+def last_weekday(d=datetime.today(), weekday=4):
+    offset = (d.weekday() - weekday) % 7
+    return (d - timedelta(days=offset)).date()
+
+def next_weekday(d=datetime.today(), weekday=4):
+    days_ahead = weekday - d.weekday()
+    if days_ahead <= 0: # Target day already happened this week
+        days_ahead += 7
+    return (d + timedelta(days_ahead)).date()
     
 def split_date_range(start, end, pdays=92):
-    firstDate = datetime.datetime.strptime(start, "%d-%m-%Y")
-    lastDate = datetime.datetime.strptime(end, "%d-%m-%Y")
+    firstDate = datetime.strptime(start, "%d-%m-%Y")
+    lastDate = datetime.strptime(end, "%d-%m-%Y")
     startdate = firstDate
     startdatelist = []
     enddatelist = []
     while startdate <= lastDate:
-        enddate = startdate + datetime.timedelta(days=pdays - 1)
+        enddate = startdate + timedelta(days=pdays - 1)
         startdatelist.append(startdate.strftime("%d-%m-%Y"))
         if enddate > lastDate:
             enddatelist.append(lastDate.strftime("%d-%m-%Y"))
         enddatelist.append(enddate.strftime("%d-%m-%Y"))
-        startdate = enddate + datetime.timedelta(days=1)
+        startdate = enddate + timedelta(days=1)
     for sdate, edate in zip(startdatelist, enddatelist):
         yield sdate, edate
 
-
-def get_hist_index_data(symbol="NIFTY 50", file=None):
-    if symbol.upper() == "NIFTY 50":
-        file = "https://raw.githubusercontent.com/arun7pulse/askindex/master/NIFTY%2050.csv"
-    if symbol.upper() == "NIFTY BANK":
-        file = "https://raw.githubusercontent.com/arun7pulse/askindex/master/NIFTY%20BANK.csv"
-    df = pd.read_csv(file, parse_dates=True, index_col='date',
+def get_hist_index_data(symbol="NIFTY 50"):
+    file = f"{symbol}.csv"
+    try :
+        df = pd.read_csv(file, parse_dates=True, index_col='date',
+                     dayfirst=True, error_bad_lines=False).replace("-", method='bfill')
+        print("Hist data Loaded from Local file: ", symbol)
+    except Exception as f: 
+        print("NO local File, Loading from Github", f)
+        if symbol.upper() == "NIFTY 50":
+            file = "https://raw.githubusercontent.com/arun7pulse/askindex/master/NIFTY%2050.csv"
+        if symbol.upper() == "NIFTY BANK":
+            file = "https://raw.githubusercontent.com/arun7pulse/askindex/master/NIFTY%20BANK.csv"
+        df = pd.read_csv(file, parse_dates=True, index_col='date',
                      dayfirst=True, error_bad_lines=False).replace("-", method='bfill')
     df = df.astype({"symbol": "category", "open": "float64", "high": "float64",
                     "low": "float64", "close": "float64", "volume": "float64", "value": "float64"})
     return df
 
 def get_daily_index_data(symbol="NIFTY 50", start=None, end=None):
-    end = (datetime.datetime.today().date()).strftime('%d-%m-%Y') if end == None else end
-    start = (datetime.datetime.today().date()-datetime.timedelta(days=99)).strftime('%d-%m-%Y') if start ==  None else start
+    end = (datetime.today().date()).strftime('%d-%m-%Y') if end == None else end
+    start = (datetime.today().date()-timedelta(days=99)).strftime('%d-%m-%Y') if start ==  None else start
     if start != end:
         url1 = "https://www1.nseindia.com/products/dynaContent/equities/indices/historicalindices.jsp?indexType="
         url2 = symbol.replace(" ", "%20").replace("&", "%26").upper()
@@ -89,11 +106,11 @@ def get_daily_index_data(symbol="NIFTY 50", start=None, end=None):
     print("start date and end date is same")
     return None
 
-def get_all_index_data(symbol='NIFTY 50', start='01-01-2010', end=(datetime.datetime.today().date()).strftime('%d-%m-%Y')):
+def get_all_index_data(symbol='NIFTY 50', start='01-01-2010', end=(datetime.today().date()).strftime('%d-%m-%Y')):
     idx = pd.DataFrame()
     idx = idx.append(get_hist_index_data(symbol=symbol))
     # if idx.index[-1].values 
-    start = (idx.index.max()+datetime.timedelta(days=1)).strftime('%d-%m-%Y')
+    start = (idx.index.max()+timedelta(days=1)).strftime('%d-%m-%Y')
     for sdate, edate in split_date_range(start, end):
         print("Loading Index Data :", symbol, sdate, edate)
         df = get_daily_index_data(symbol=symbol, start=sdate, end=edate)
@@ -107,8 +124,8 @@ def get_all_index_data(symbol='NIFTY 50', start='01-01-2010', end=(datetime.date
     return idx
 
 def dataframe_target(df, top_percent=5):
-    df['ltgt'] = ((1 + round((df[df['high_pct'] < 0].quantile(0.05)['high_pct'])/100, 4)) * df['close'].shift()).fillna(method='bfill')
-    df['utgt'] = ((1 + round((df[df['low_pct'] > 0].quantile(0.95)['low_pct'])/100, 4)) * df['close'].shift()).fillna(method='bfill')
+    df['ltgt'] = ((1 + round((df[df['high_pct'] < 0].quantile(top_percent/100)['high_pct'])/100, 4)) * df['close'].shift()).fillna(method='bfill')
+    df['utgt'] = ((1 + round((df[df['low_pct'] > 0].quantile(1-top_percent/100)['low_pct'])/100, 4)) * df['close'].shift()).fillna(method='bfill')
     df['stat'] = df['close'].between(df['ltgt'], df['utgt'], inclusive=False)
     df['miss'] = np.where(df['stat'] == False, np.where(df['utgt'] < df['close'], round(df['close'] - df['utgt'], 2), round(df['close'] - df['ltgt'], 2)), "PROFIT")
     return df 
@@ -122,7 +139,9 @@ class Indices(object):
         self.dff = get_hist_index_data(symbol=self.symbol)
         self.df = self.dff.drop('symbol', axis=1)
         self.calc_frequency()
-        
+        if self.df.index[-1] < last_thursday():
+            self.load_livedata()
+
     def load_livedata(self):
         self.dff = get_all_index_data(symbol=self.symbol)
         self.df = self.dff.drop('symbol', axis=1)

@@ -13,3 +13,4 @@ myenv
 # Spyder project settings
 .spyderproject
 .spyproject
+*.csv
